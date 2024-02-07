@@ -12,7 +12,7 @@ import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
-from consts.consts import CLASSES, COMMENTS_TEXT, LOGIN, NOTIFICATIONS_CB, SAVE, GRADE
+from consts.consts import classes, COMMENTS_TEXT, LOGIN, NOTIFICATIONS_CB, SAVE, GRADE
 
 
 s = Service("C:\chromedriver.exe")
@@ -36,7 +36,7 @@ def login():
 
 
 login()
-to_check = [399]
+to_check = [397]
 
 
 def search_user(name: str):
@@ -151,7 +151,7 @@ def uncheck_notifications():
 
 
 for task in to_check:
-    class_data = CLASSES[task]
+    class_data = classes[task]
     task_num = class_data["task_number_in_excel"][0]
     path = class_data["path"]
     task_to_fill = class_data["task_code_in_moodle"][0]
@@ -168,7 +168,7 @@ for task in to_check:
     for i, data in df.iterrows():
         students, grade, comment, has_comment = extract_details(data)
         print(f"Filling grades for {str(students)}, {str(comment)}")
-
+        time.sleep(1)
         for student in students:
             time.sleep(1)
             search_user(student)
