@@ -5,98 +5,77 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import InvalidElementStateException
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
 import os
 import sys
 import pandas as pd
 import time
 from urllib.parse import urlparse, parse_qs
 
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
 from consts.consts import CLASSES, COMMENTS_TEXT, LOGIN, NOTIFICATIONS_CB, SAVE, GRADE
 
-
 s = Service("C:\chromedriver.exe")
 driver = webdriver.Chrome(service=s)
-#
-# Open the login page
-driver.get("https://moodle.ruppin.ac.il/login/index.php")
-#
+
+driver.maximize_window()
+
+driver.implicitly_wait(10)  # Implicit wait
 
 
 def login():
+    driver.get("https://moodle.ruppin.ac.il/login/index.php")
     username_field = driver.find_element(By.ID, "username")
     password_field = driver.find_element(By.ID, "password")
     username_field.clear()
     password_field.clear()
     username_field.send_keys(username)
     password_field.send_keys(psw)
-
     driver.find_element(By.ID, LOGIN).click()
 
 
-login()
-to_check = [1487]
-
-
 def extract_details(data: pd.Series, ex_str: str):
-    """
-    extracts the necessary details of a task, such as students, comment on the task and its grade.
-    @returns students, grade, comment, has_comment
-    """
     students = [name.strip() for name in data["students"].split(",")]
     has_grade = not pd.isna(data[ex_str])
-    if has_grade == True:
-        grade = int(data[ex_str])
-    else:
-        grade = None
-    comment = data[ex_str + "_comments"]
-    has_comment = pd.notna(comment)
-    if has_comment == False:
-        comment = None
+    grade = int(data[ex_str]) if has_grade else None
+    comment_str = f"{ex_str}_comments"
+    has_comment = pd.notna(data[comment_str])
+    comment = data.get(comment_str) if has_comment else None
     return students, grade, comment
 
 
 def check_all_students_selected():
     print("in check_all_students_selected")
-    max_retry = 3  # Maximum retry attempts
+    max_retry = 3
     for _ in range(max_retry):
         try:
-            # Wait for the elements to be present
-            wait = WebDriverWait(driver, 20)  # Increased timeout
+            wait = WebDriverWait(driver, 20)
             elements = wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li > a"))
             )
-
-            # Filter elements with inner HTML as 'X'
             target_elements = [
                 element
                 for element in elements
                 if element.get_attribute("innerText") == "הכל"
             ]
-
-            # Click on each filtered element
             for element in target_elements:
-                # Check if the element is interactable before clicking
                 if element.is_displayed() and element.is_enabled():
                     element.click()
                     print("Clicked!")
-                else:
-                    print("Element not interactable")
-            break  # Break the loop if successful
+            break
         except (StaleElementReferenceException, InvalidElementStateException):
-            continue  # Retry if exceptions occur
+            continue
 
 
 def uncheck_notifications():
-    print("in uncheck_notifications")
-    # Find the element by name with a wait
-    element = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.NAME, "sendstudentnotifications"))
+    select_element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.NAME, NOTIFICATIONS_CB))
     )
-    # Set its value
-    element.send_keys(0)
+    select = Select(select_element)
+    select.select_by_value("0")
 
 
 def set_quick_grading():
@@ -104,78 +83,111 @@ def set_quick_grading():
     checkbox = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.NAME, "quickgrading"))
     )
-    # Check if the checkbox is currently checked
     if not checkbox.is_selected():
-        # If checked, uncheck it by clicking
         checkbox.click()
 
 
-def fill_grade(student_name, grade, comment=None, user_id=None):
+def get_id_by_student_name(student_name: str):
     xpath = f'//tr/td[3]/a[text()="{student_name}"]'
-    # print(xpath)
-    a_element = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, xpath))
-    )
-    href = a_element.get_attribute("href")
-
-    # Parse the URL and extract the 'id' parameter
-    parsed_url = urlparse(href)
-    id_value = parse_qs(parsed_url.query).get("id", [None])[0]
-
-    # Fill in the grade
-    grade_xpath = f'//td/input[@id="quickgrade_{id_value}"]'
-    grade_input = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, grade_xpath))
-    )
-    # Check if the input field is empty
-    if grade_input.get_attribute("value") == "":
-        input_value = grade
-        grade_input.send_keys(input_value)
-
-    else:
+    try:
+        a_element = WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located((By.XPATH, xpath))
+        )
+    except TimeoutException:
+        print(f"TimeoutException: Failed to find element for {student_name}.")
         return
 
-    # fill comment if needed
-    if comment is not None:
-        textarea_id = f"quickgrade_comments_{id_value}"
-        textarea_element = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.ID, textarea_id))
+    href = a_element.get_attribute("href")
+    parsed_url = urlparse(href)
+    id_value = parse_qs(parsed_url.query).get("id", [None])[0]
+    return id_value
+
+
+def fill_grade(student_name, grade, comment=None):
+    student_moodle_id = get_id_by_student_name(student_name)
+
+    print(f"Student Id: {str(student_moodle_id)}. Student Name: {student_name}.")
+
+    grade_xpath = f'//td/input[@id="quickgrade_{student_moodle_id}"]'
+    try:
+        grade_input = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.XPATH, grade_xpath))
         )
-        # Set the desired text
-        textarea_value = comment
-        textarea_element.clear()
-        textarea_element.send_keys(textarea_value)
+    except TimeoutException:
+        print(f"TimeoutException: Failed to find grade input for {student_name}.")
+        return
+
+    if grade_input.get_attribute("value") == "":
+        grade_input.clear()
+        grade_input.send_keys(grade)
+    if comment is not None:
+        textarea_id = f"quickgrade_comments_{student_moodle_id}"
+        textarea_element = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.ID, textarea_id))
+        )
+        textarea_element.send_keys(comment)
 
 
-# iterate over class id
-for task in to_check:
-    class_data = CLASSES[task]
-    task_num = class_data["task_number_in_excel"]
-    path = class_data["path"]
-    task_to_fill = class_data["task_code_in_moodle"]
-    for task_num, task_moodle_id in zip(task_num, task_to_fill):
-        ex_str = f"ex{task_num}"
-        df = pd.read_excel(os.path.join(path, "grades.xlsx"))
-        # Navigate to the grading page
-        path = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_moodle_id}&action=grading"
-        driver.get(path)
-        # check_all_students_selected()
-        # print("check_all_students_selected Done")
-        uncheck_notifications()
-        # print("set_element_value_by_name Done")
-        # set_quick_grading()
-        # print("set_quick_grading Done")
-        for i, data in df.iterrows():
-            students, grade, comment, has_comment, has_grade = extract_details(
-                data, ex_str
-            )
-            if has_grade == False:
-                continue
-            print(f"Filling grades for {str(students)}, {str(comment)}")
-            time.sleep(1)
+def save_changes():
+    driver.execute_script("document.body.style.zoom='0.0'")
 
-            for student in students:
-                fill_grade(student, grade, comment)
+    try:
+        element = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.NAME, SAVE))
+        )
+
+        # Scroll the element into view using JavaScript
+        driver.execute_script("arguments[0].scrollIntoView();", element)
+
+        # Wait until the element is clickable
+        element = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.NAME, SAVE))
+        )
+
+        # Click the element
+        element.click()
+    except TimeoutException:
+        print(f"TimeoutException: Failed to click on save grades button.")
 
 
-driver.close()
+def wait_until_url_changes(driver, current_url, timeout=60):
+    WebDriverWait(driver, timeout).until(EC.url_changes(current_url))
+
+
+def fill_grades():
+    try:
+        for task in to_check:
+            class_data = CLASSES[task]
+            task_num = class_data["task_number_in_excel"]
+            path = class_data["path"]
+            task_to_fill = class_data["task_code_in_moodle"]
+            for task_num, task_moodle_id in zip(task_num, task_to_fill):
+                ex_str = f"ex{task_num}"
+                df = pd.read_excel(os.path.join(path, "grades.xlsx"))
+                grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_moodle_id}&action=grading"
+                driver.get(grading_page)
+                uncheck_notifications()
+                driver.execute_script("document.body.style.zoom='0.5'")
+
+                for _, data in df.iterrows():
+                    students, grade, comment = extract_details(data, ex_str)
+                    if grade is None:
+                        continue
+                    print(f"Filling grades for {students}, {comment}")
+                    time.sleep(1)
+                    for student in students:
+                        fill_grade(student, grade, comment)
+                        time.sleep(2)
+                    print()
+                save_changes()
+                wait_until_url_changes(driver, driver.current_url, timeout=60)
+
+    finally:
+        print("Done!!!")
+        driver.quit()
+
+
+if __name__ == "__main__":
+    login()
+    to_check = [1304]
+    fill_grades()
