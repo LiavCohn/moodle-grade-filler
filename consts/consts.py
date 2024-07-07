@@ -16,4 +16,10 @@ CLASSES = {
         "task_number_in_excel": ["2"],
         "task_code_in_moodle": ["38464"],
     },
+    1517: {
+        "name": "C",
+        "path": "C:\\Users\liavc\\OneDrive\\מסמכים\בדיקת מטלות\\סמסטר ב\\C ערב",
+        "task_number_in_excel": ["9"],
+        "task_code_in_moodle": ["138912"],
+    },
 }
