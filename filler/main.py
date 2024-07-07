@@ -16,7 +16,7 @@ from urllib.parse import urlparse, parse_qs
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
-from consts.consts import CLASSES, COMMENTS_TEXT, LOGIN, NOTIFICATIONS_CB, SAVE, GRADE
+from consts.consts import CLASSES, LOGIN, NOTIFICATIONS_CB, SAVE
 
 s = Service("C:\chromedriver.exe")
 driver = webdriver.Chrome(service=s)
@@ -48,7 +48,6 @@ def extract_details(data: pd.Series, ex_str: str):
 
 
 def check_all_students_selected():
-    print("in check_all_students_selected")
     max_retry = 3
     for _ in range(max_retry):
         try:
@@ -79,7 +78,6 @@ def uncheck_notifications():
 
 
 def set_quick_grading():
-    print("in set_quick_grading")
     checkbox = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.NAME, "quickgrading"))
     )
@@ -180,7 +178,7 @@ def fill_grades():
                         time.sleep(2)
                     print()
                 save_changes()
-                wait_until_url_changes(driver, driver.current_url, timeout=60)
+                wait_until_url_changes(driver, driver.current_url, timeout=120)
 
     finally:
         print("Done!!!")
@@ -189,5 +187,5 @@ def fill_grades():
 
 if __name__ == "__main__":
     login()
-    to_check = [1304]
+    to_check = [1517]
     fill_grades()
