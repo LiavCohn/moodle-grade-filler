@@ -185,7 +185,37 @@ def fill_grades():
         driver.quit()
 
 
+def filler(task_nums, task_codes, path):
+    # s = Service("C:\chromedriver.exe")
+    # driver = webdriver.Chrome(service=s)
+
+    # driver.maximize_window()
+
+    # driver.implicitly_wait(10)  # Implicit wait
+    # login()
+    for task_num, task_code in zip(task_nums, task_codes):
+        ex_str = f"ex{task_num}"
+        df = pd.read_excel(os.path.join(path, "grades.xlsx"))
+        grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
+        driver.get(grading_page)
+        uncheck_notifications()
+        driver.execute_script("document.body.style.zoom='0.5'")
+        for _, data in df.iterrows():
+            students, grade, comment = extract_details(data, ex_str)
+            if grade is None:
+                continue
+            print(f"Filling grades for {students}, {comment}")
+            time.sleep(1)
+            for student in students:
+                fill_grade(student, grade, comment)
+                time.sleep(2)
+            print()
+        save_changes()
+        wait_until_url_changes(driver, driver.current_url, timeout=120)
+        driver.close()
+
+
 if __name__ == "__main__":
     login()
-    to_check = [1517]
+    to_check = [1570]
     fill_grades()

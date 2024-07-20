@@ -22,4 +22,10 @@ CLASSES = {
         "task_number_in_excel": ["9"],
         "task_code_in_moodle": ["138912"],
     },
+    1570: {
+        "name": "neurons",
+        "path": r"C:\Users\liavc\OneDrive\מסמכים\בדיקת מטלות\סמסטר ב\נוירונים",
+        "task_number_in_excel": ["4"],
+        "task_code_in_moodle": ["140794"],
+    },
 }
