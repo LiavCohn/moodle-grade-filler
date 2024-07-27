@@ -4,6 +4,8 @@ import threading
 import sqlite3
 import time
 
+# from filler.main import grade_filler
+
 
 class MoodleGradeFillerApp:
     def __init__(self, root):
@@ -51,6 +53,7 @@ class MoodleGradeFillerApp:
         self.conn.commit()
 
     def display_courses(self):
+        print("in display courses")
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
@@ -113,11 +116,10 @@ class MoodleGradeFillerApp:
             )
             fill_btn.grid(row=4, column=2, padx=5, pady=5)
 
-            status_label = tk.Label(
-                course_frame, text=self.thread_status.get(course_id, "Not Started")
-            )
+            status_value = self.thread_status.get(course_id, "Not Started")
+            status_label = tk.Label(course_frame, text=status_value)
             status_label.grid(row=4, column=3, padx=5, pady=5)
-            self.thread_status[course_id] = status_label
+            self.thread_status[course_id] = status_value
 
     def add_course_popup(self):
         popup = tk.Toplevel(self.root)
@@ -248,7 +250,9 @@ class MoodleGradeFillerApp:
 
                     self.conn.commit()
                 task_popup.destroy()
+                popup.destroy()
                 self.edit_course_popup(course_id)
+                self.display_courses()
 
             save_tasks_btn = tk.Button(
                 task_popup, text="Save Tasks", command=save_tasks
@@ -308,7 +312,7 @@ class MoodleGradeFillerApp:
         threads = []
         for task_num, task_code in zip(task_nums, task_codes):
             t = threading.Thread(
-                target=self.temp,
+                target=grade_filler,
                 args=(
                     task_num,
                     task_code,
@@ -328,12 +332,12 @@ class MoodleGradeFillerApp:
 
         print("All threads are done!")
 
-    def temp(self, task_num, task_code, path):
-        time.sleep(1)
-        if task_code == "1111":
-            raise Exception("Oops!!")
-        print(f"Task Num: {task_num}. Task Code: {task_code}. Path: {path}")
-        time.sleep(3)
+    # def temp(self, task_num, task_code, path):
+    #     time.sleep(1)
+    #     if task_code == "1111":
+    #         raise Exception("Oops!!")
+    #     print(f"Task Num: {task_num}. Task Code: {task_code}. Path: {path}")
+    #     time.sleep(3)
 
     def fill_grades(self, course_id):
         try:
@@ -364,6 +368,6 @@ class MoodleGradeFillerApp:
 
 # Create the main tkinter window
 root = tk.Tk()
-root.geometry("780x300")
+root.geometry("780x360")
 app = MoodleGradeFillerApp(root)
 root.mainloop()
