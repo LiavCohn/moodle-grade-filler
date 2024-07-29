@@ -53,13 +53,11 @@ class MoodleGradeFillerApp:
         self.conn.commit()
 
     def display_courses(self):
-        print("in display courses")
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
         self.cursor.execute("SELECT * FROM courses")
         courses = self.cursor.fetchall()
-
         for course in courses:
             course_id, name, path = course
 
@@ -233,6 +231,7 @@ class MoodleGradeFillerApp:
             def save_tasks():
                 task_numbers = task_numbers_entry.get().strip()
                 task_codes = task_codes_entry.get().strip()
+                print("save_tasks: ", task_codes, task_numbers)
                 if task_codes and task_numbers:
                     splitted_task_numbers = [
                         num.strip() for num in task_numbers.split(",")
@@ -249,10 +248,12 @@ class MoodleGradeFillerApp:
                         )
 
                     self.conn.commit()
-                task_popup.destroy()
-                popup.destroy()
-                self.edit_course_popup(course_id)
-                self.display_courses()
+                    task_popup.destroy()
+                    popup.destroy()
+                    self.display_courses()
+                    self.edit_course_popup(course_id)
+                else:
+                    task_popup.destroy()
 
             save_tasks_btn = tk.Button(
                 task_popup, text="Save Tasks", command=save_tasks
