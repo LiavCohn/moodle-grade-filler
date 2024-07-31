@@ -3,6 +3,7 @@ from tkinter import messagebox
 import threading
 import sqlite3
 import time
+from consts.exceptions import FillerException
 
 # from filler.main import grade_filler
 
@@ -117,7 +118,7 @@ class MoodleGradeFillerApp:
             status_value = self.thread_status.get(course_id, "Not Started")
             status_label = tk.Label(course_frame, text=status_value)
             status_label.grid(row=4, column=3, padx=5, pady=5)
-            self.thread_status[course_id] = status_value
+            self.thread_status[course_id] = status_label
 
     def add_course_popup(self):
         popup = tk.Toplevel(self.root)
@@ -309,58 +310,52 @@ class MoodleGradeFillerApp:
             self.conn.commit()
             self.display_courses()
 
-    def filler(self, task_nums, task_codes, path):
+    def temp(self, task_num, task_code, path, course_name):
+        time.sleep(3)
+        if task_num == "2":
+            raise FillerException(
+                task_code=task_code,
+                task_num=task_num,
+                error="Nope!",
+                course_name=course_name,
+            )
+        print(task_num, task_code, path)
+        time.sleep(1)
+
+    def filler(self, task_nums, task_codes, path, course_name):
         threads = []
         for task_num, task_code in zip(task_nums, task_codes):
             t = threading.Thread(
-                target=grade_filler,
-                args=(
-                    task_num,
-                    task_code,
-                    path,
-                ),
+                target=self.temp,
+                args=(task_num, task_code, path, course_name),
             )
             threads.append(t)
 
         for thread in threads:
-            thread.start()
-
-        for thread in threads:
             try:
-                thread.join()
-            except Exception as e:
-                print("error: ", e)
+                thread.start()
+            except FillerException as e:
+                print(e)
+        for thread in threads:
+            thread.join()
 
         print("All threads are done!")
 
-    # def temp(self, task_num, task_code, path):
-    #     time.sleep(1)
-    #     if task_code == "1111":
-    #         raise Exception("Oops!!")
-    #     print(f"Task Num: {task_num}. Task Code: {task_code}. Path: {path}")
-    #     time.sleep(3)
-
     def fill_grades(self, course_id):
-        try:
-            self.cursor.execute(
-                "SELECT path FROM courses WHERE course_id = ?", (course_id,)
-            )
-            path = self.cursor.fetchone()[0]
-
-            self.cursor.execute(
-                "SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?",
-                (course_id,),
-            )
-            tasks = self.cursor.fetchall()
-
-            task_nums = [task[0] for task in tasks]
-            task_codes = [task[1] for task in tasks]
-
-            self.filler(task_nums, task_codes, path)
-            self.thread_status[course_id].config(text="Completed")
-        except Exception as e:
-            print(e)
-            self.thread_status[course_id].config(text=f"Failed: {str(e)}")
+        self.cursor.execute(
+            "SELECT path,name FROM courses WHERE course_id = ?", (course_id,)
+        )
+        res = self.cursor.fetchone()
+        path, name = res[0], res[1]
+        self.cursor.execute(
+            "SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?",
+            (course_id,),
+        )
+        tasks = self.cursor.fetchall()
+        task_nums = [task[0] for task in tasks]
+        task_codes = [task[1] for task in tasks]
+        self.filler(task_nums, task_codes, path, name)
+        self.thread_status[course_id].config(text="Completed")
 
     def start_filler_thread(self, course_id):
         self.thread_status[course_id].config(text="Running")
