@@ -1,8 +1,21 @@
-# moodle-grade-filler
+**Moodle Grade Filler**
 
-a script for filling students grades in Moodle. the current moodle system is not ideal so some parameters needs to be filled by hand,
-like tasks number.
-For every course there is an excel with a column named 'students', specifying the students names seperated by a comma.
-also, for each task X, there is a desingnated column named 'exX' and 'exX_comments'. This is a format that i found comfortable using, but others may be used.
-The automation will fill each student's grade & comment on the task if there is one.
+The Moodle Grade Filler is a Python application that automates grade entry into the Moodle LMS using Selenium and provides a GUI for course and task management with Tkinter.
+
+**Tech Stack:**
+
+- **Python**
+- **GUI**: Tkinter
+- **Web Automation**: Selenium
+- **Database**: SQLite
+- **Multi-threading**: threading module
+- **Version Control**: Git (GitHub)
+
+**Features:**
+
+- Add, edit, and delete courses and tasks.
+- Automate grade entry into Moodle.
+- Real-time status updates.
+- Persistent data storage with SQLite.
+
 ![Example](gui-example.png)
