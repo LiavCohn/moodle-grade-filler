@@ -4,8 +4,9 @@ import threading
 import sqlite3
 import time
 from consts.exceptions import FillerException
-
-# from filler.main import grade_filler
+import concurrent.futures
+from filler.Filler import Filler
+from filler.main import grade_filler
 
 
 class MoodleGradeFillerApp:
@@ -115,8 +116,7 @@ class MoodleGradeFillerApp:
             )
             fill_btn.grid(row=4, column=2, padx=5, pady=5)
 
-            status_value = self.thread_status.get(course_id, "Not Started")
-            status_label = tk.Label(course_frame, text=status_value)
+            status_label = tk.Label(course_frame, text="Not Started")
             status_label.grid(row=4, column=3, padx=5, pady=5)
             self.thread_status[course_id] = status_label
 
@@ -146,12 +146,12 @@ class MoodleGradeFillerApp:
             course_id = course_id_entry.get().strip()
             course_name = course_name_entry.get().strip()
             file_path = file_path_entry.get().strip()
-
+            formatted_path = f"{file_path}"
             self.add_course(
                 course_id,
                 {
                     "name": course_name,
-                    "path": file_path,
+                    "path": formatted_path,
                     "task_number_in_excel": [],
                     "task_code_in_moodle": [],
                 },
@@ -323,23 +323,16 @@ class MoodleGradeFillerApp:
         time.sleep(1)
 
     def filler(self, task_nums, task_codes, path, course_name):
-        threads = []
-        for task_num, task_code in zip(task_nums, task_codes):
-            t = threading.Thread(
-                target=self.temp,
-                args=(task_num, task_code, path, course_name),
-            )
-            threads.append(t)
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(
+                    grade_filler, task_nums, task_codes, path, course_name
+                )
+                successful_tasks = future.result()
+        except Exception as e:
+            print(f"Filler has failed! {e}")
 
-        for thread in threads:
-            try:
-                thread.start()
-            except FillerException as e:
-                print(e)
-        for thread in threads:
-            thread.join()
-
-        print("All threads are done!")
+        return successful_tasks
 
     def fill_grades(self, course_id):
         self.cursor.execute(
@@ -354,8 +347,21 @@ class MoodleGradeFillerApp:
         tasks = self.cursor.fetchall()
         task_nums = [task[0] for task in tasks]
         task_codes = [task[1] for task in tasks]
-        self.filler(task_nums, task_codes, path, name)
+        filler_obj = Filler(
+            task_codes=task_codes, task_nums=task_nums, path=path, course_name=name
+        )
+        # successful_tasks = self.filler(task_nums, task_codes, path, name)
+        successful_tasks = filler_obj.filler()
         self.thread_status[course_id].config(text="Completed")
+        print(successful_tasks)
+        # Remove successful tasks from the database
+        for task_num, task_code in successful_tasks:
+            self.cursor.execute(
+                "DELETE FROM tasks WHERE course_id = ? AND task_number_in_excel = ? AND task_code_in_moodle = ?",
+                (course_id, task_num, task_code),
+            )
+        self.conn.commit()
+        self.display_courses()
 
     def start_filler_thread(self, course_id):
         self.thread_status[course_id].config(text="Running")

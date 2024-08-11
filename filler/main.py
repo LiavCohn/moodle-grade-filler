@@ -17,16 +17,17 @@ from urllib.parse import urlparse, parse_qs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
 from consts.consts import CLASSES, LOGIN, NOTIFICATIONS_CB, SAVE
+from consts.exceptions import FillerException
 
-s = Service("C:\chromedriver.exe")
-driver = webdriver.Chrome(service=s)
+# s = Service("C:\chromedriver.exe")
+# driver = webdriver.Chrome(service=s)
 
-driver.maximize_window()
+# driver.maximize_window()
 
-driver.implicitly_wait(10)  # Implicit wait
+# driver.implicitly_wait(10)  # Implicit wait
 
 
-def login():
+def login(driver):
     driver.get("https://moodle.ruppin.ac.il/login/index.php")
     username_field = driver.find_element(By.ID, "username")
     password_field = driver.find_element(By.ID, "password")
@@ -47,7 +48,7 @@ def extract_details(data: pd.Series, ex_str: str):
     return students, grade, comment
 
 
-def check_all_students_selected():
+def check_all_students_selected(driver):
     max_retry = 3
     for _ in range(max_retry):
         try:
@@ -69,7 +70,7 @@ def check_all_students_selected():
             continue
 
 
-def uncheck_notifications():
+def uncheck_notifications(driver):
     select_element = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.NAME, NOTIFICATIONS_CB))
     )
@@ -77,7 +78,7 @@ def uncheck_notifications():
     select.select_by_value("0")
 
 
-def set_quick_grading():
+def set_quick_grading(driver):
     checkbox = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.NAME, "quickgrading"))
     )
@@ -85,7 +86,7 @@ def set_quick_grading():
         checkbox.click()
 
 
-def get_id_by_student_name(student_name: str):
+def get_id_by_student_name(student_name: str, driver):
     xpath = f'//tr/td[3]/a[text()="{student_name}"]'
     try:
         a_element = WebDriverWait(driver, 60).until(
@@ -101,7 +102,7 @@ def get_id_by_student_name(student_name: str):
     return id_value
 
 
-def fill_grade(student_name, grade, comment=None):
+def fill_grade(student_name, grade, driver, comment=None):
     student_moodle_id = get_id_by_student_name(student_name)
 
     print(f"Student Id: {str(student_moodle_id)}. Student Name: {student_name}.")
@@ -126,7 +127,7 @@ def fill_grade(student_name, grade, comment=None):
         textarea_element.send_keys(comment)
 
 
-def save_changes():
+def save_changes(driver):
     driver.execute_script("document.body.style.zoom='0.0'")
 
     try:
@@ -185,37 +186,70 @@ def fill_grades():
         driver.quit()
 
 
-def filler(task_nums, task_codes, path):
-    # s = Service("C:\chromedriver.exe")
-    # driver = webdriver.Chrome(service=s)
+import time
 
-    # driver.maximize_window()
 
-    # driver.implicitly_wait(10)  # Implicit wait
-    # login()
+def grade_filler(task_nums, task_codes, path, course_name):
+    print("in grade_filler")
+    successful_tasks = []
+
     for task_num, task_code in zip(task_nums, task_codes):
-        ex_str = f"ex{task_num}"
-        df = pd.read_excel(os.path.join(path, "grades.xlsx"))
-        grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
-        driver.get(grading_page)
-        uncheck_notifications()
-        driver.execute_script("document.body.style.zoom='0.5'")
-        for _, data in df.iterrows():
-            students, grade, comment = extract_details(data, ex_str)
-            if grade is None:
-                continue
-            print(f"Filling grades for {students}, {comment}")
-            time.sleep(1)
-            for student in students:
-                fill_grade(student, grade, comment)
-                time.sleep(2)
-            print()
-        save_changes()
-        wait_until_url_changes(driver, driver.current_url, timeout=120)
-        driver.close()
+        try:
+            s = Service("C:\\chromedriver.exe")
+            driver = webdriver.Chrome(service=s)
+            driver.maximize_window()
+            driver.implicitly_wait(10)  # Implicit wait
+            login(driver)
+            ex_str = f"ex{task_num}"
+            df = pd.read_excel(os.path.join(path, "grades.xlsx"))
+            print(task_num, task_code)
+            grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
+            driver.get(grading_page)
+            time.sleep(5)
+            if task_num == "2":
+                raise FillerException(
+                    task_code=task_code,
+                    task_num=task_num,
+                    error="Oops!!",
+                    course_name=course_name,
+                )
+            # Example grading process
+            # uncheck_notifications()
+            # driver.execute_script("document.body.style.zoom='0.5'")
+            # for _, data in df.iterrows():
+            #     students, grade, comment = extract_details(data, ex_str)
+            #     if grade is None:
+            #         continue
+            #     print(f"Filling grades for {students}, {comment}")
+            #     time.sleep(1)
+            #     for student in students:
+            #         fill_grade(student, grade, comment)
+            #         time.sleep(2)
+            #     print()
+            # save_changes()
+            # wait_until_url_changes(driver, driver.current_url, timeout=120)
+            driver.close()
+
+            successful_tasks.append((task_num, task_code))  # Log successful tasks
+
+        except FillerException as e:
+            print("Filler has failed!", e.task_code, e.course_name)
+            with open("error_log.txt", "a") as log_file:
+                log_file.write(
+                    f"[{course_name}]: Task failed: {e.task_code}, Course: {e.course_name}\n"
+                )
+        except Exception as e:
+            print(f"Unexpected error for task {task_num}: {e}")
+            with open("error_log.txt", "a") as log_file:
+                log_file.write(
+                    f"[{course_name}]: Unexpected error for task {task_num}: {e}\n"
+                )
+
+    print(f"[{course_name}] All tasks are done!")
+    return successful_tasks
 
 
-if __name__ == "__main__":
-    login()
-    to_check = [1570]
-    fill_grades()
+# if __name__ == "__main__":
+#     login()
+#     to_check = [1570]
+#     fill_grades()
