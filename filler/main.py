@@ -103,7 +103,7 @@ def get_id_by_student_name(student_name: str, driver):
 
 
 def fill_grade(student_name, grade, driver, comment=None):
-    student_moodle_id = get_id_by_student_name(student_name)
+    student_moodle_id = get_id_by_student_name(student_name, driver)
 
     print(f"Student Id: {str(student_moodle_id)}. Student Name: {student_name}.")
 
@@ -202,32 +202,27 @@ def grade_filler(task_nums, task_codes, path, course_name):
             login(driver)
             ex_str = f"ex{task_num}"
             df = pd.read_excel(os.path.join(path, "grades.xlsx"))
+
             print(task_num, task_code)
             grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
             driver.get(grading_page)
             time.sleep(5)
-            if task_num == "2":
-                raise FillerException(
-                    task_code=task_code,
-                    task_num=task_num,
-                    error="Oops!!",
-                    course_name=course_name,
-                )
+
             # Example grading process
-            # uncheck_notifications()
-            # driver.execute_script("document.body.style.zoom='0.5'")
-            # for _, data in df.iterrows():
-            #     students, grade, comment = extract_details(data, ex_str)
-            #     if grade is None:
-            #         continue
-            #     print(f"Filling grades for {students}, {comment}")
-            #     time.sleep(1)
-            #     for student in students:
-            #         fill_grade(student, grade, comment)
-            #         time.sleep(2)
-            #     print()
-            # save_changes()
-            # wait_until_url_changes(driver, driver.current_url, timeout=120)
+            uncheck_notifications(driver)
+            driver.execute_script("document.body.style.zoom='0.5'")
+            for _, data in df.iterrows():
+                students, grade, comment = extract_details(data, ex_str)
+                if grade is None:
+                    continue
+                print(f"Filling grades for {students}, {comment}, {grade}")
+                time.sleep(1)
+                for student in students:
+                    fill_grade(student, grade, driver, comment)
+                    time.sleep(2)
+                print()
+            save_changes(driver)
+            wait_until_url_changes(driver, driver.current_url, timeout=120)
             driver.close()
 
             successful_tasks.append((task_num, task_code))  # Log successful tasks

@@ -66,7 +66,7 @@ class Filler:
             except (StaleElementReferenceException, InvalidElementStateException):
                 continue
 
-    def extract_details(data: pd.Series, ex_str: str):
+    def extract_details(self, data: pd.Series, ex_str: str):
         students = [name.strip() for name in data["students"].split(",")]
         has_grade = not pd.isna(data[ex_str])
         grade = int(data[ex_str]) if has_grade else None
@@ -111,11 +111,15 @@ class Filler:
 
         grade_xpath = f'//td/input[@id="quickgrade_{student_moodle_id}"]'
         try:
-            grade_input = WebDriverWait(self.driver, 20).until(
+            grade_input = WebDriverWait(self.driver, 40).until(
                 EC.presence_of_element_located((By.XPATH, grade_xpath))
             )
         except TimeoutException:
             print(f"TimeoutException: Failed to find grade input for {student_name}.")
+            with open("error_log.txt", "a") as log_file:
+                log_file.write(
+                    f"TimeoutException: Failed to find grade input for {student_name}.Need to fill {grade}.\n"
+                )
             return
 
         if grade_input.get_attribute("value") == "":
@@ -123,7 +127,7 @@ class Filler:
             grade_input.send_keys(grade)
         if comment is not None:
             textarea_id = f"quickgrade_comments_{student_moodle_id}"
-            textarea_element = WebDriverWait(self.driver, 20).until(
+            textarea_element = WebDriverWait(self.driver, 40).until(
                 EC.element_to_be_clickable((By.ID, textarea_id))
             )
             textarea_element.send_keys(comment)
@@ -191,7 +195,7 @@ class Filler:
                 self.wait_until_url_changes(
                     self.driver, self.driver.current_url, timeout=120
                 )
-                # self.driver.close()
+                self.driver.close()
 
                 successful_tasks.append((task_num, task_code))  # Log successful tasks
 
@@ -202,6 +206,7 @@ class Filler:
 
         print(f"[{self.course_name}] All tasks are done!")
         self.driver.close()
+        print(successful_tasks)
         return successful_tasks
 
     def filler(self):
