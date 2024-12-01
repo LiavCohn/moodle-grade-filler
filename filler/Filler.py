@@ -192,9 +192,7 @@ class Filler:
                         time.sleep(2)
                     print()
                 self.save_changes()
-                self.wait_until_url_changes(
-                    self.driver, self.driver.current_url, timeout=120
-                )
+                self.wait_until_url_changes(self.driver.current_url, timeout=120)
                 self.driver.close()
 
                 successful_tasks.append((task_num, task_code))  # Log successful tasks

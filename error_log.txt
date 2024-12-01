@@ -17,3 +17,6 @@
 
 [C]: Unexpected error for task 3: Message: 
 
+TimeoutException: Failed to find grade input for אורן צאושו.Need to fill 100.
+TimeoutException: Failed to find grade input for דן חילקביץ.Need to fill 100.
+TimeoutException: Failed to find grade input for יעלה רוזנצוייב.Need to fill 100.
