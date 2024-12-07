@@ -116,9 +116,9 @@ class Filler:
             )
         except TimeoutException:
             print(f"TimeoutException: Failed to find grade input for {student_name}.")
-            with open("error_log.txt", "a") as log_file:
+            with open("error_log.txt", "a", encoding="utf-8") as log_file:
                 log_file.write(
-                    f"TimeoutException: Failed to find grade input for {student_name}.Need to fill {grade}.\n"
+                    f"TimeoutException: Failed to find grade input for {str(student_name)}.Need to fill {grade}.\n"
                 )
             return
 
@@ -156,29 +156,23 @@ class Filler:
     def wait_until_url_changes(self, current_url, timeout=60):
         WebDriverWait(self.driver, timeout).until(EC.url_changes(current_url))
 
-    def grade_filler(self):
-        print("in grade_filler")
-        successful_tasks = []
 
+def grade_filler(self):
+    print("in grade_filler")
+    successful_tasks = []
+
+    try:
         self.login()
         for task_num, task_code in zip(self.task_nums, self.task_codes):
             try:
                 self.driver.maximize_window()
-                self.driver.implicitly_wait(10)  # Implicit wait
+                self.driver.implicitly_wait(10)
                 ex_str = f"ex{task_num}"
                 df = pd.read_excel(os.path.join(self.path, "grades.xlsx"))
                 print(task_num, task_code)
                 grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
                 self.driver.get(grading_page)
                 time.sleep(5)
-                # for testing: uncomment
-                # if task_num == "2":
-                #     raise FillerException(
-                #         task_code=task_code,
-                #         task_num=task_num,
-                #         error="Oops!!",
-                #         course_name=self.course_name,
-                #     )
                 self.uncheck_notifications()
                 self.driver.execute_script("document.body.style.zoom='0.5'")
                 for _, data in df.iterrows():
@@ -193,25 +187,24 @@ class Filler:
                     print()
                 self.save_changes()
                 self.wait_until_url_changes(self.driver.current_url, timeout=120)
-                self.driver.close()
-
-                successful_tasks.append((task_num, task_code))  # Log successful tasks
-
+                successful_tasks.append((task_num, task_code))
             except FillerException as e:
                 print("Filler has failed!", e.task_code, e.course_name)
-                with open("error_log.txt", "a") as log_file:
+                with open("error_log.txt", "a", encoding="utf-8") as log_file:
                     log_file.write(f"{e.message}\n")
-
-        print(f"[{self.course_name}] All tasks are done!")
+    finally:
         self.driver.close()
+        print(f"[{self.course_name}] All tasks are done!")
         print(successful_tasks)
         return successful_tasks
 
-    def filler(self):
-        try:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(self.grade_filler)
-                successful_tasks = future.result()
-        except Exception as e:
-            print(f"Filler has failed! {e}")
-        return successful_tasks
+
+def filler(self):
+    successful_tasks = []
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(self.grade_filler)
+            successful_tasks = future.result()
+    except Exception as e:
+        print(f"Filler has failed! {e}")
+    return successful_tasks

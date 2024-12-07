@@ -20,3 +20,8 @@
 TimeoutException: Failed to find grade input for אורן צאושו.Need to fill 100.
 TimeoutException: Failed to find grade input for דן חילקביץ.Need to fill 100.
 TimeoutException: Failed to find grade input for יעלה רוזנצוייב.Need to fill 100.
+TimeoutException: Failed to find grade input for רגינה בסה.Need to fill 100.
+TimeoutException: Failed to find grade input for עומאר מחאמיד.Need to fill 100.
+TimeoutException: Failed to find grade input for מקסים זולטר.Need to fill 82.
+TimeoutException: Failed to find grade input for דניאל מצ'טנר.Need to fill 100.
+TimeoutException: Failed to find grade input for בשאר סאלימן.Need to fill 100.
