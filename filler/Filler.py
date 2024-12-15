@@ -156,55 +156,53 @@ class Filler:
     def wait_until_url_changes(self, current_url, timeout=60):
         WebDriverWait(self.driver, timeout).until(EC.url_changes(current_url))
 
+    def grade_filler(self):
+        print("in grade_filler")
+        successful_tasks = []
 
-def grade_filler(self):
-    print("in grade_filler")
-    successful_tasks = []
+        try:
+            self.login()
+            for task_num, task_code in zip(self.task_nums, self.task_codes):
+                try:
+                    self.driver.maximize_window()
+                    self.driver.implicitly_wait(10)
+                    ex_str = f"ex{task_num}"
+                    df = pd.read_excel(os.path.join(self.path, "grades.xlsx"))
+                    print(task_num, task_code)
+                    grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
+                    self.driver.get(grading_page)
+                    time.sleep(5)
+                    self.uncheck_notifications()
+                    self.driver.execute_script("document.body.style.zoom='0.5'")
+                    for _, data in df.iterrows():
+                        students, grade, comment = self.extract_details(data, ex_str)
+                        if grade is None:
+                            continue
+                        print(f"Filling grades for {students}, {comment}")
+                        time.sleep(1)
+                        for student in students:
+                            self.fill_grade(student, grade, comment)
+                            time.sleep(2)
+                        print()
+                    self.save_changes()
+                    self.wait_until_url_changes(self.driver.current_url, timeout=120)
+                    successful_tasks.append((task_num, task_code))
+                except FillerException as e:
+                    print("Filler has failed!", e.task_code, e.course_name)
+                    with open("error_log.txt", "a", encoding="utf-8") as log_file:
+                        log_file.write(f"{e.message}\n")
+        finally:
+            self.driver.close()
+            print(f"[{self.course_name}] All tasks are done!")
+            print(successful_tasks)
+            return successful_tasks
 
-    try:
-        self.login()
-        for task_num, task_code in zip(self.task_nums, self.task_codes):
-            try:
-                self.driver.maximize_window()
-                self.driver.implicitly_wait(10)
-                ex_str = f"ex{task_num}"
-                df = pd.read_excel(os.path.join(self.path, "grades.xlsx"))
-                print(task_num, task_code)
-                grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
-                self.driver.get(grading_page)
-                time.sleep(5)
-                self.uncheck_notifications()
-                self.driver.execute_script("document.body.style.zoom='0.5'")
-                for _, data in df.iterrows():
-                    students, grade, comment = self.extract_details(data, ex_str)
-                    if grade is None:
-                        continue
-                    print(f"Filling grades for {students}, {comment}")
-                    time.sleep(1)
-                    for student in students:
-                        self.fill_grade(student, grade, comment)
-                        time.sleep(2)
-                    print()
-                self.save_changes()
-                self.wait_until_url_changes(self.driver.current_url, timeout=120)
-                successful_tasks.append((task_num, task_code))
-            except FillerException as e:
-                print("Filler has failed!", e.task_code, e.course_name)
-                with open("error_log.txt", "a", encoding="utf-8") as log_file:
-                    log_file.write(f"{e.message}\n")
-    finally:
-        self.driver.close()
-        print(f"[{self.course_name}] All tasks are done!")
-        print(successful_tasks)
+    def filler(self):
+        successful_tasks = []
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(self.grade_filler)
+                successful_tasks = future.result()
+        except Exception as e:
+            print(f"Filler has failed! {e}")
         return successful_tasks
-
-
-def filler(self):
-    successful_tasks = []
-    try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(self.grade_filler)
-            successful_tasks = future.result()
-    except Exception as e:
-        print(f"Filler has failed! {e}")
-    return successful_tasks
