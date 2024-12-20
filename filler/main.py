@@ -103,10 +103,14 @@ def get_id_by_student_name(student_name: str, driver):
 
 
 def fill_grade(student_name, grade, driver, comment=None):
-    student_moodle_id = get_id_by_student_name(student_name, driver)
+    has_moodle_id = student_name.split(" ")[-1].isnumeric()
+    if not has_moodle_id:
+        student_moodle_id = get_id_by_student_name(student_name, driver)
+    else:
+        student_moodle_id = student_name.split(" ")[-1]
+        student_name = student_name.split(" ")[:-1]
 
     print(f"Student Id: {str(student_moodle_id)}. Student Name: {student_name}.")
-
     grade_xpath = f'//td/input[@id="quickgrade_{student_moodle_id}"]'
     try:
         grade_input = WebDriverWait(driver, 20).until(

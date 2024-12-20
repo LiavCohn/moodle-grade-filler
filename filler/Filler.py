@@ -105,7 +105,13 @@ class Filler:
         return id_value
 
     def fill_grade(self, student_name: str, grade, comment=None):
-        student_moodle_id = self.get_id_by_student_name(student_name)
+        # edge case incase double name exist- add the id to the name of the student
+        has_moodle_id = student_name.split(" ")[-1].isnumeric()
+        if not has_moodle_id:
+            student_moodle_id = self.get_id_by_student_name(student_name)
+        else:
+            student_moodle_id = student_name.split(" ")[-1]
+            student_name = student_name.split(" ")[:-1]
 
         print(f"Student Id: {str(student_moodle_id)}. Student Name: {student_name}.")
 
@@ -175,18 +181,32 @@ class Filler:
                     self.uncheck_notifications()
                     self.driver.execute_script("document.body.style.zoom='0.5'")
                     for _, data in df.iterrows():
-                        students, grade, comment = self.extract_details(data, ex_str)
-                        if grade is None:
-                            continue
-                        print(f"Filling grades for {students}, {comment}")
-                        time.sleep(1)
-                        for student in students:
-                            self.fill_grade(student, grade, comment)
-                            time.sleep(2)
-                        print()
+                        try:
+                            students, grade, comment = self.extract_details(
+                                data, ex_str
+                            )
+                            if grade is None:
+                                continue
+                            print(f"Filling grades for {students}, {comment}")
+                            time.sleep(1)
+                            for student in students:
+                                self.fill_grade(student, grade, comment)
+                                time.sleep(2)
+                            print()
+                        except Exception as e:
+                            print(
+                                f"Error filling grade for data: {data}, Exception: {e}"
+                            )
+                            with open(
+                                "error_log.txt", "a", encoding="utf-8"
+                            ) as log_file:
+                                log_file.write(
+                                    f"Error filling grade for data {data}: {e}\n"
+                                )
                     self.save_changes()
                     self.wait_until_url_changes(self.driver.current_url, timeout=120)
                     successful_tasks.append((task_num, task_code))
+                    print(successful_tasks)
                 except FillerException as e:
                     print("Filler has failed!", e.task_code, e.course_name)
                     with open("error_log.txt", "a", encoding="utf-8") as log_file:
