@@ -2,3 +2,4 @@
 .env
 classes.py
 courses.db
+error_log.txt
