@@ -9,16 +9,14 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import os
-import sys
 import pandas as pd
 import time
 from urllib.parse import urlparse, parse_qs
 import concurrent.futures
-
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
 from consts.consts import LOGIN, NOTIFICATIONS_CB, SAVE
 from consts.exceptions import FillerException
+from datetime import datetime
 
 
 class Filler:
@@ -29,6 +27,13 @@ class Filler:
         self.course_name = course_name
         s = Service("C:\\chromedriver.exe")
         self.driver = webdriver.Chrome(service=s)
+        self.error_log_file = "error_log.txt"
+
+    def write_error(self, msg):
+        currentDateAndTime = datetime.now()
+
+        with open(self.error_log_file, "a", encoding="utf-8") as log_file:
+            log_file.write(f"[{currentDateAndTime}]:" + msg)
 
     def login(self):
         self.driver.get("https://moodle.ruppin.ac.il/login/index.php")
@@ -122,10 +127,9 @@ class Filler:
             )
         except TimeoutException:
             print(f"TimeoutException: Failed to find grade input for {student_name}.")
-            with open("error_log.txt", "a", encoding="utf-8") as log_file:
-                log_file.write(
-                    f"TimeoutException: Failed to find grade input for {str(student_name)}.Need to fill {grade}.\n"
-                )
+            self.write_error(
+                f"TimeoutException: Failed to find grade input for {str(student_name)}.Need to fill {grade}.\n"
+            )
             return
 
         if grade_input.get_attribute("value") == "":
@@ -197,20 +201,17 @@ class Filler:
                             print(
                                 f"Error filling grade for data: {data}, Exception: {e}"
                             )
-                            with open(
-                                "error_log.txt", "a", encoding="utf-8"
-                            ) as log_file:
-                                log_file.write(
-                                    f"Error filling grade for data {data}: {e}\n"
-                                )
+                            self.write_error(
+                                f"Error filling grade for data {data}: {e}\n"
+                            )
+
+                    successful_tasks.append((task_num, task_code))
                     self.save_changes()
                     self.wait_until_url_changes(self.driver.current_url, timeout=120)
-                    successful_tasks.append((task_num, task_code))
                     print(successful_tasks)
                 except FillerException as e:
                     print("Filler has failed!", e.task_code, e.course_name)
-                    with open("error_log.txt", "a", encoding="utf-8") as log_file:
-                        log_file.write(f"{e.message}\n")
+                    self.write_error(f"{e.message}\n")
         finally:
             self.driver.close()
             print(f"[{self.course_name}] All tasks are done!")
