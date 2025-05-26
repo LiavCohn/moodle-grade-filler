@@ -1,21 +1,19 @@
 import tkinter as tk
 from tkinter import messagebox
 import threading
-import sqlite3
 import time
 from consts.exceptions import FillerException
 import concurrent.futures
 from filler.Filler import Filler
 from filler.main import grade_filler
+from db_manager import DatabaseManager
 
 
 class MoodleGradeFillerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Moodle Grade Filler")
-
-        self.conn = sqlite3.connect("courses.db", check_same_thread=False)
-        self.cursor = self.conn.cursor()
+        self.db = DatabaseManager()
         self.thread_status = {}
 
         self.main_frame = tk.Frame(root)
@@ -45,29 +43,31 @@ class MoodleGradeFillerApp:
         )
         add_course_btn.pack(pady=10)
 
+    def __del__(self):
+        """Cleanup when the app is destroyed."""
+        if hasattr(self, 'db'):
+            self.db.close()
+
     def add_course(self, course_id, data):
-        self.cursor.execute(
+        self.db.execute_update(
             """
             INSERT INTO courses (course_id, name, path) VALUES (?, ?, ?)
-        """,
-            (course_id, data["name"], data["path"]),
+            """,
+            (course_id, data["name"], data["path"])
         )
-        self.conn.commit()
 
     def display_courses(self):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
-        self.cursor.execute("SELECT * FROM courses")
-        courses = self.cursor.fetchall()
+        courses = self.db.execute_query("SELECT * FROM courses")
         for course in courses:
             course_id, name, path = course
 
-            self.cursor.execute(
+            tasks = self.db.execute_query(
                 "SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?",
-                (course_id,),
+                (course_id,)
             )
-            tasks = self.cursor.fetchall()
             task_numbers = [task[0] for task in tasks]
             task_codes = [task[1] for task in tasks]
 
@@ -169,9 +169,9 @@ class MoodleGradeFillerApp:
         popup = tk.Toplevel(self.root)
         popup.title(f"Edit Course {course_id}")
 
-        self.cursor.execute("SELECT * FROM courses WHERE course_id = ?", (course_id,))
-        course = self.cursor.fetchone()
-        name, path = course[1], course[2]
+        self.db.execute_query("SELECT * FROM courses WHERE course_id = ?", (course_id,))
+        course = self.db.execute_query("SELECT name, path FROM courses WHERE course_id = ?", (course_id,))
+        name, path = course[0][0], course[0][1]
 
         tk.Label(popup, text="Course ID:").grid(
             row=0, column=0, padx=10, pady=10, sticky=tk.W
@@ -193,11 +193,11 @@ class MoodleGradeFillerApp:
         file_path_entry.insert(tk.END, path)
         file_path_entry.grid(row=2, column=1, padx=10, pady=10)
 
-        self.cursor.execute(
+        self.db.execute_query(
             "SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?",
-            (course_id,),
+            (course_id,)
         )
-        tasks = self.cursor.fetchall()
+        tasks = self.db.execute_query("SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?", (course_id,))
         task_numbers = [task[0] for task in tasks]
         task_codes = [task[1] for task in tasks]
 
@@ -232,29 +232,41 @@ class MoodleGradeFillerApp:
             def save_tasks():
                 task_numbers = task_numbers_entry.get().strip()
                 task_codes = task_codes_entry.get().strip()
-                print("save_tasks: ", task_codes, task_numbers)
-                if task_codes and task_numbers:
-                    splitted_task_numbers = [
-                        num.strip() for num in task_numbers.split(",")
-                    ]
-                    splitted_task_codes = [num.strip() for num in task_codes.split(",")]
-                    for task_code, task_number in zip(
-                        splitted_task_codes, splitted_task_numbers
-                    ):
-                        self.cursor.execute(
-                            """
-                            INSERT INTO tasks (course_id, task_number_in_excel, task_code_in_moodle) VALUES (?, ?, ?)
+                
+                if not task_codes or not task_numbers:
+                    messagebox.showerror("Error", "Both task numbers and codes are required")
+                    return
+                    
+                splitted_task_numbers = [num.strip() for num in task_numbers.split(",")]
+                splitted_task_codes = [code.strip() for code in task_codes.split(",")]
+                
+                if len(splitted_task_numbers) != len(splitted_task_codes):
+                    messagebox.showerror("Error", "Number of task numbers must match number of task codes")
+                    return
+                    
+                # Check for duplicates before inserting
+                for task_number, task_code in zip(splitted_task_numbers, splitted_task_codes):
+                    existing = self.db.execute_query(
+                        "SELECT 1 FROM tasks WHERE course_id = ? AND (task_number_in_excel = ? OR task_code_in_moodle = ?)",
+                        (course_id, task_number, task_code)
+                    )
+                    if existing:
+                        messagebox.showerror("Error", f"Task number {task_number} or code {task_code} already exists for this course")
+                        return
+                        
+                # If we get here, no duplicates found, proceed with insertion
+                for task_code, task_number in zip(splitted_task_codes, splitted_task_numbers):
+                    self.db.execute_update(
+                        """
+                        INSERT INTO tasks (course_id, task_number_in_excel, task_code_in_moodle) VALUES (?, ?, ?)
                         """,
-                            (course_id, task_number, task_code),
-                        )
+                        (course_id, task_number, task_code),
+                    )
 
-                    self.conn.commit()
-                    task_popup.destroy()
-                    popup.destroy()
-                    self.display_courses()
-                    self.edit_course_popup(course_id)
-                else:
-                    task_popup.destroy()
+                task_popup.destroy()
+                popup.destroy()
+                self.display_courses()
+                self.edit_course_popup(course_id)
 
             save_tasks_btn = tk.Button(
                 task_popup, text="Save Tasks", command=save_tasks
@@ -264,8 +276,7 @@ class MoodleGradeFillerApp:
             task_popup.mainloop()
 
         def clear_tasks():
-            self.cursor.execute("DELETE FROM tasks WHERE course_id = ?", (course_id,))
-            self.conn.commit()
+            self.db.execute_update("DELETE FROM tasks WHERE course_id = ?", (course_id,))
             task_numbers_display.config(text="")
             task_codes_display.config(text="")
 
@@ -283,13 +294,12 @@ class MoodleGradeFillerApp:
             new_name = course_name_entry.get().strip()
             new_path = file_path_entry.get().strip()
 
-            self.cursor.execute(
+            self.db.execute_update(
                 """
                 UPDATE courses SET name = ?, path = ? WHERE course_id = ?
             """,
                 (new_name, new_path, course_id),
             )
-            self.conn.commit()
 
             popup.destroy()
             self.display_courses()
@@ -302,25 +312,13 @@ class MoodleGradeFillerApp:
     def delete_course(self, course_id):
         confirm = messagebox.askyesno(
             "Delete Confirmation",
-            f"Are you sure you want to delete Course {course_id}?",
+            f"Are you sure you want to delete Course {course_id}?"
         )
         if confirm:
-            self.cursor.execute("DELETE FROM courses WHERE course_id = ?", (course_id,))
-            self.cursor.execute("DELETE FROM tasks WHERE course_id = ?", (course_id,))
-            self.conn.commit()
+            self.db.execute_update("DELETE FROM courses WHERE course_id = ?", (course_id,))
+            self.db.execute_update("DELETE FROM tasks WHERE course_id = ?", (course_id,))
             self.display_courses()
 
-    def temp(self, task_num, task_code, path, course_name):
-        time.sleep(3)
-        if task_num == "2":
-            raise FillerException(
-                task_code=task_code,
-                task_num=task_num,
-                error="Nope!",
-                course_name=course_name,
-            )
-        print(task_num, task_code, path)
-        time.sleep(1)
 
     def filler(self, task_nums, task_codes, path, course_name):
         try:
@@ -335,16 +333,16 @@ class MoodleGradeFillerApp:
         return successful_tasks
 
     def fill_grades(self, course_id):
-        self.cursor.execute(
+        self.db.execute_query(
             "SELECT path,name FROM courses WHERE course_id = ?", (course_id,)
         )
-        res = self.cursor.fetchone()
-        path, name = res[0], res[1]
-        self.cursor.execute(
+        res = self.db.execute_query("SELECT path,name FROM courses WHERE course_id = ?", (course_id,))
+        path, name = res[0][0], res[0][1]
+        self.db.execute_query(
             "SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?",
-            (course_id,),
+            (course_id,)
         )
-        tasks = self.cursor.fetchall()
+        tasks = self.db.execute_query("SELECT task_number_in_excel, task_code_in_moodle FROM tasks WHERE course_id = ?", (course_id,))
         task_nums = [task[0] for task in tasks]
         task_codes = [task[1] for task in tasks]
         filler_obj = Filler(
@@ -356,11 +354,10 @@ class MoodleGradeFillerApp:
         print(successful_tasks)
         # Remove successful tasks from the database
         for task_num, task_code in successful_tasks:
-            self.cursor.execute(
+            self.db.execute_update(
                 "DELETE FROM tasks WHERE course_id = ? AND task_number_in_excel = ? AND task_code_in_moodle = ?",
                 (course_id, task_num, task_code),
             )
-        self.conn.commit()
         self.display_courses()
 
     def start_filler_thread(self, course_id):

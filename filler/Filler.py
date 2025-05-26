@@ -33,7 +33,7 @@ class Filler:
         currentDateAndTime = datetime.now()
 
         with open(self.error_log_file, "a", encoding="utf-8") as log_file:
-            log_file.write(f"[{currentDateAndTime}]:" + msg)
+            log_file.write(f"[{self.course_name}][{currentDateAndTime}]:" + msg)
 
     def login(self):
         self.driver.get("https://moodle.ruppin.ac.il/login/index.php")
