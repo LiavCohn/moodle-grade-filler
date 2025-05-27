@@ -208,7 +208,6 @@ class Filler:
                     successful_tasks.append((task_num, task_code))
                     self.save_changes()
                     self.wait_until_url_changes(self.driver.current_url, timeout=120)
-                    print(successful_tasks)
                 except FillerException as e:
                     print("Filler has failed!", e.task_code, e.course_name)
                     self.write_error(f"{e.message}\n")
