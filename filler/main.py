@@ -16,7 +16,7 @@ from urllib.parse import urlparse, parse_qs
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
-from consts.consts import CLASSES, LOGIN, NOTIFICATIONS_CB, SAVE
+from consts.consts import LOGIN, NOTIFICATIONS_CB, SAVE
 from consts.exceptions import FillerException
 
 # s = Service("C:\chromedriver.exe")
