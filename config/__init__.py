@@ -6,5 +6,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Access the environment variables
-username = os.getenv("USER")
-psw = os.getenv("PWD")
+username = os.getenv("MOODLE_USER")
+psw = os.getenv("MOODLE_PASSWORD")

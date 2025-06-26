@@ -16,18 +16,18 @@ from urllib.parse import urlparse, parse_qs
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from config import username, psw
-from consts.consts import LOGIN, NOTIFICATIONS_CB, SAVE
+from consts.consts import LOGIN, NOTIFICATIONS_CB, SAVE,CHROME_DRIVER
 from consts.exceptions import FillerException
 
-# s = Service("C:\chromedriver.exe")
-# driver = webdriver.Chrome(service=s)
+s = Service(CHROME_DRIVER)
+driver = webdriver.Chrome(service=s)
 
 # driver.maximize_window()
 
 # driver.implicitly_wait(10)  # Implicit wait
 
 
-def login(driver):
+def login():
     driver.get("https://moodle.ruppin.ac.il/login/index.php")
     username_field = driver.find_element(By.ID, "username")
     password_field = driver.find_element(By.ID, "password")
@@ -248,7 +248,7 @@ def grade_filler(task_nums, task_codes, path, course_name):
     return successful_tasks
 
 
-# if __name__ == "__main__":
-#     login()
-#     to_check = [1570]
-#     fill_grades()
+if __name__ == "__main__":
+    login()
+    # to_check = [1570]
+    # fill_grades()
