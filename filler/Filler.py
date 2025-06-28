@@ -166,6 +166,28 @@ class Filler:
     def wait_until_url_changes(self, current_url, timeout=60):
         WebDriverWait(self.driver, timeout).until(EC.url_changes(current_url))
 
+
+    def get_grades_df(self):
+        try:
+            import platform
+            if platform.platform().lower().startswith("mac"):
+                from numbers_parser import Document
+                path = os.path.join(self.path)
+                print(path)
+                doc = Document(path)
+                sheet = doc.sheets[0]
+                table = sheet.tables[0]
+                data = table.rows(values_only=True)
+                df = pd.DataFrame(data[1:], columns=data[0])
+                df_cleaned_all = df.dropna(how='all')
+
+                return df_cleaned_all
+
+            else:
+                return pd.read_excel(os.path.join(self.path, "grades.xlsx"))
+        except Exception as e:
+            print(f"Error getting grades df: {e}")
+
     def grade_filler(self):
         print("in grade_filler")
         successful_tasks = []
@@ -177,7 +199,7 @@ class Filler:
                     self.driver.maximize_window()
                     self.driver.implicitly_wait(10)
                     ex_str = f"ex{task_num}"
-                    df = pd.read_excel(os.path.join(self.path, "grades.xlsx"))
+                    df = self.get_grades_df()
                     print(task_num, task_code)
                     grading_page = f"https://moodle.ruppin.ac.il/mod/assign/view.php?id={task_code}&action=grading"
                     self.driver.get(grading_page)
@@ -204,7 +226,6 @@ class Filler:
                             self.write_error(
                                 f"Error filling grade for data {data}: {e}\n"
                             )
-
                     successful_tasks.append((task_num, task_code))
                     self.save_changes()
                     self.wait_until_url_changes(self.driver.current_url, timeout=120)

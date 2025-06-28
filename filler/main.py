@@ -248,7 +248,7 @@ def grade_filler(task_nums, task_codes, path, course_name):
     return successful_tasks
 
 
-if __name__ == "__main__":
-    login()
+# if __name__ == "__main__":
+#     login()
     # to_check = [1570]
     # fill_grades()
