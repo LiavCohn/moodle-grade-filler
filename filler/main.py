@@ -19,8 +19,7 @@ from config import username, psw
 from consts.consts import LOGIN, NOTIFICATIONS_CB, SAVE,CHROME_DRIVER
 from consts.exceptions import FillerException
 
-s = Service(CHROME_DRIVER)
-driver = webdriver.Chrome(service=s)
+
 
 # driver.maximize_window()
 
@@ -28,6 +27,8 @@ driver = webdriver.Chrome(service=s)
 
 
 def login():
+    s = Service(CHROME_DRIVER)
+    driver = webdriver.Chrome(service=s)
     driver.get("https://moodle.ruppin.ac.il/login/index.php")
     username_field = driver.find_element(By.ID, "username")
     password_field = driver.find_element(By.ID, "password")
